@@ -1,0 +1,18 @@
+# play-roblox-local gitignore
+# ---------------------------------
+# Logs and runtime artifacts
+*.log
+*.out
+__pycache__/
+*.pyc
+
+# Server runtime state
+cookie.txt  # contains .ROBLOSECURITY — never commit
+
+# Screenshots (optional)
+*.png
+
+# Dumped assets that may change via live-fill
+setup.rbxcdn.com/webclient/version-*/PlatformContent/pc/textures/sky/*.tex
+setup.rbxcdn.com/webclient/version-*/content/fonts/NotoSansCJKjp-Regular.otf
+setup.rbxcdn.com/webclient/version-*/PlatformContent/pc/textures/sky/indoor512_*.tex

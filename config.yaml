@@ -1,0 +1,37 @@
+# play-roblox-local configuration
+# ---------------------------------
+# Edit these values to customise the localhost mirror.
+# Most can be overridden on the command line via `python3 server.py KEY=VALUE`.
+
+port: 8080                      # TCP port the server listens on
+build: version-75f1039cb4964863-RobloxWebClient   # WebClient build directory name
+page_build: 038e4bd621bee962e64ed84fac16608407267adc   # _next build-hash dir name
+
+# Live-fill: if enabled, misses inside the listed host dirs are fetched once
+# from the real CDN and persisted into the dump, then served locally.
+enable_fill: true
+
+# Cookie authentication for game joins.
+# Set the path to a .ROBLOSECURITY cookie file (bare value or name=value).
+# The server will auto-wrap a bare token as .ROBLOSECURITY=<value>.
+cookie_path: cookie.txt
+
+# If enabled, the /__up/ bridge forwards game traffic (gamejoin, assetdelivery, etc.)
+# to the real Roblox hosts with live-like headers. Turn off if you want a purely
+# offline experience (some features may break).
+enable_bridge: true
+
+# Hosts that are served directly from the dump (virtual host routing).
+# Do not change unless you know what you're doing.
+hosts:
+  - apis.roblox.com
+  - clientsettings.roblox.com
+  - clientsettingscdn.roblox.com
+  - economy.roblox.com
+  - games.roblox.com
+  - locale.roblox.com
+  - play.roblox.com
+  - setup.rbxcdn.com
+  - thumbnails.roblox.com
+  - tr.rbxcdn.com
+  - users.roblox.com
