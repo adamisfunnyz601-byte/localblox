@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#090b14">
+  <meta name="description" content="Netblox — discover Roblox experiences and play in your browser.">
+  <title>Netblox — Play in your browser</title>
+  <link rel="stylesheet" href="/netblox/styles.css">
+</head>
+<body>
+  <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Netblox home"><span class="brand-mark">N</span><span>netblox<span class="brand-dot">.</span></span></a>
+    <nav class="main-nav"><a class="active" href="#home">Home</a><a href="#discover">Discover</a><a href="#about">About</a></nav>
+    <button class="login-button" id="loginButton"><span class="user-icon">↗</span> Sign in</button>
+  </header>
+
+  <main id="home">
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="pulse"></span> BROWSER GAMING, REIMAGINED</div>
+        <h1>Your next<br><span>world awaits.</span></h1>
+        <p>Find an experience, hit play, and jump straight into the action — right from your browser.</p>
+        <a class="primary-button" href="#discover">Explore experiences <span>→</span></a>
+        <div class="hero-note"><span class="tiny-shield">◆</span> Your Roblox password never goes through Netblox.</div>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <div class="orbit orbit-a"></div><div class="orbit orbit-b"></div>
+        <div class="floating-card card-back">✦</div>
+        <div class="floating-card card-front"><span class="cube">▧</span><strong>PLAY</strong><small>YOUR WAY</small></div>
+        <div class="spark spark-a">✧</div><div class="spark spark-b">✦</div><div class="spark spark-c">✧</div>
+      </div>
+    </section>
+
+    <section class="discover-section" id="discover">
+      <div class="section-heading">
+        <div><div class="eyebrow">THE PLAYGROUND</div><h2>Find your next game</h2><p class="section-subtitle">A starter collection of experiences to explore.</p></div>
+        <label class="search-box"><span>⌕</span><input id="searchInput" type="search" placeholder="Search experiences..." autocomplete="off"></label>
+      </div>
+      <div class="filter-row" id="filterRow">
+        <button class="filter active" data-filter="All">All games</button>
+        <button class="filter" data-filter="Adventure">Adventure</button>
+        <button class="filter" data-filter="Roleplay">Roleplay</button>
+        <button class="filter" data-filter="Obby">Obby</button>
+        <button class="filter" data-filter="Action">Action</button>
+      </div>
+      <div class="game-grid" id="gameGrid">
+        <article class="game-card" data-title="Brookhaven RP" data-category="Roleplay"><div class="game-art art-city"><span>🏙️</span><i>ROLEPLAY</i></div><div class="game-info"><div><h3>Brookhaven RP</h3><p>Build a life in the city</p></div><a class="play-button" href="/games/start?placeId=4924922222" aria-label="Play Brookhaven RP">▶</a></div></article>
+        <article class="game-card" data-title="Blox Fruits" data-category="Adventure"><div class="game-art art-sea"><span>🌊</span><i>ADVENTURE</i></div><div class="game-info"><div><h3>Blox Fruits</h3><p>Explore, battle, become stronger</p></div><a class="play-button" href="/games/start?placeId=2753915549" aria-label="Play Blox Fruits">▶</a></div></article>
+        <article class="game-card" data-title="Tower of Hell" data-category="Obby"><div class="game-art art-tower"><span>🗼</span><i>OBBY</i></div><div class="game-info"><div><h3>Tower of Hell</h3><p>Can you reach the top?</p></div><a class="play-button" href="/games/start?placeId=1962086868" aria-label="Play Tower of Hell">▶</a></div></article>
+        <article class="game-card" data-title="DOORS" data-category="Adventure"><div class="game-art art-doors"><span>🚪</span><i>HORROR</i></div><div class="game-info"><div><h3>DOORS</h3><p>Open the door. Face the unknown.</p></div><a class="play-button" href="/games/start?placeId=6516141723" aria-label="Play DOORS">▶</a></div></article>
+        <article class="game-card" data-title="Adopt Me!" data-category="Roleplay"><div class="game-art art-pets"><span>🐾</span><i>ROLEPLAY</i></div><div class="game-info"><div><h3>Adopt Me!</h3><p>Collect pets and make memories</p></div><a class="play-button" href="/games/start?placeId=920587237" aria-label="Play Adopt Me">▶</a></div></article>
+        <article class="game-card" data-title="Murder Mystery 2" data-category="Action"><div class="game-art art-mystery"><span>🕵️</span><i>ACTION</i></div><div class="game-info"><div><h3>Murder Mystery 2</h3><p>Trust nobody. Find the truth.</p></div><a class="play-button" href="/games/start?placeId=142823291" aria-label="Play Murder Mystery 2">▶</a></div></article>
+      </div>
+      <div class="empty-state" id="emptyState" hidden>No experiences match that search.</div>
+      <p class="catalog-note">Starter picks only — live Roblox discovery and trending categories will be connected after the public API integration is verified.</p>
+    </section>
+
+    <section class="bottom-banner" id="about"><div class="banner-icon">N</div><div><h2>Made for the browser.</h2><p>Netblox is the launcher. Your device runs the game client.</p></div><span class="banner-tag">POWERED BY ENZONIC</span></section>
+  </main>
+
+  <footer><a class="brand footer-brand" href="/"><span class="brand-mark">N</span><span>netblox<span class="brand-dot">.</span></span></a><span>Independent browser launcher concept. Not affiliated with Roblox Corporation.</span></footer>
+
+  <dialog id="loginDialog" class="login-dialog">
+    <button class="dialog-close" id="closeDialog" aria-label="Close">×</button>
+    <div class="dialog-mark">N</div><div class="eyebrow">ACCOUNT CONNECTION</div>
+    <h2>Sign in to Netblox</h2>
+    <p>Roblox sign-in must use Roblox's official OAuth authorisation. Netblox will never display a password form, proxy Roblox's login page, or collect your Roblox session cookie.</p>
+    <div class="notice"><strong>Not connected yet</strong><span>OAuth application registration and its approved callback URL are required before account sign-in can be enabled.</span></div>
+    <a class="official-link" href="https://www.roblox.com/login" target="_blank" rel="noopener noreferrer">Open official Roblox sign-in ↗</a>
+    <button class="secondary-button" id="gotIt">Got it</button>
+  </dialog>
+  <script src="/netblox/app.js" defer></script>
+</body>
+</html>
