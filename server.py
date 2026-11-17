@@ -3,11 +3,12 @@
 Localhost server for the play.roblox.com site dump (see README.md).
 
 Routing:
-  /                     -> 302 /games/start
+  /                     -> Netblox launcher
   /<dumped-host>/<path> -> virtual host (e.g. /games.roblox.com/v1/games)
   /__up/<host>/<path>   -> live bridge: forwarded server-side to the real
                            roblox/rbxcdn host (game traffic; browser stays
                            same-origin so CORS/cookies are a non-issue)
+  /games/start          -> play.roblox.com game client
   /<anything else>      -> play.roblox.com (default host, root-relative assets)
 
 The dump stored API responses as "<path>.html" and dropped query strings, so
