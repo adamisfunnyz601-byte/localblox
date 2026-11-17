@@ -68,18 +68,18 @@ needed).
 
 ## Authentication and account safety
 
-Netblox does **not** collect Roblox passwords or .ROBLOSECURITY cookies. The server bridge deliberately strips incoming Cookie headers and does not read a cookie file. The old Localblox cookie-file workflow is disabled in this fork.
+Netblox has its own username/password account system. Passwords are stored as PBKDF2-HMAC-SHA256 hashes with unique random salts (never plaintext). Successful registration/sign-in creates a random 30-day session token; only its SHA-256 hash is stored in SQLite. The browser receives the token only in an HttpOnly, SameSite=Lax cookie. Sign-out revokes the server-side session. No passwords or tokens are stored in localStorage/sessionStorage.
 
-Roblox OAuth 2.0 can authenticate a Roblox identity and authorize supported Open Cloud scopes, but its ID/access tokens are **not** a general Roblox gameplay session and cannot be used as a replacement for the browser's official game-join session. Netblox's sign-in UI therefore remains an integration placeholder until an approved OAuth app and a supported gameplay authentication path are available. Users are sent only to Roblox's official website for sign-in.
+Configure `NETBLOX_DB_PATH` (or `NETBLOX_DATA_DIR`) to point at persistent storage. On Enzonic, mount persistent storage and set e.g. `NETBLOX_DB_PATH=/data/netblox.sqlite3`; otherwise accounts may be lost when an ephemeral container is replaced. `COOKIE_SECURE=1` is the production default for HTTPS; set `COOKIE_SECURE=0` only for local plain-HTTP development.
 
-Live Roblox game joins may still be rejected when Roblox requires a gameplay session. Do not add cookie collection, cookie forwarding, login-page proxying, or credential capture to work around this restriction.
+Netblox accounts are separate from Roblox accounts. Roblox OAuth 2.0 can authenticate a Roblox identity and authorize supported Open Cloud scopes, but its tokens are not a general Roblox gameplay session. The launcher does not collect Roblox passwords or .ROBLOSECURITY cookies, and the old Localblox cookie-file workflow remains disabled. Live Roblox game joins may still be rejected when Roblox requires an official gameplay session.
 
 ## Netblox launcher
 
 - / serves the Netblox launcher.
 - /netblox/ contains its CSS and JavaScript assets.
 - /games/start?placeId=<id> opens the Localblox browser client.
-- The current launcher includes a small starter catalogue and client-side search/filtering. It does not yet fetch live trending/search results from Roblox.
+- The launcher includes account registration/sign-in, persistent 30-day server-side sessions, and client-side starter-catalogue search/filtering. Live Roblox trending discovery is not yet connected.
 
 The server accepts the platform PORT environment variable and binds to 0.0.0.0 for hosting behind a reverse proxy.
 
@@ -87,18 +87,6 @@ The server accepts the platform PORT environment variable and binds to 0.0.0.0 f
 
 - Server logs every request (`<status> <bytes> <verb> <path>`), plus
   `[fill] …` and `[bridge] …` lines.
-- `gamejoin` request/response bodies are appended to
-  `/tmp/opencode/join-debug.txt` (the `Cookie` header is redacted there).
-- Headless smoke test (real time — **do not** add `--virtual-time-budget`, it
-  warps Emscripten's clock):
-
-  ```fish
-  timeout 50 brave --headless=new --disable-gpu --enable-unsafe-swiftshader \
-    --user-data-dir=/tmp/opencode/brave-local-profile \
-    --enable-logging=stderr --v=0 --window-size=1280,900 \
-    "http://localhost:8080/games/start?placeId=100495655211498" \
-    | grep CONSOLE
-  ```
 
 ## Files
 
