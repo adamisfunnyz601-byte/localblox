@@ -64,12 +64,18 @@
 
   <dialog id="loginDialog" class="login-dialog">
     <button class="dialog-close" id="closeDialog" aria-label="Close">×</button>
-    <div class="dialog-mark">N</div><div class="eyebrow">ACCOUNT CONNECTION</div>
-    <h2>Sign in to Netblox</h2>
-    <p>Roblox sign-in must use Roblox's official OAuth authorisation. Netblox will never display a password form, proxy Roblox's login page, or collect your Roblox session cookie.</p>
-    <div class="notice"><strong>Not connected yet</strong><span>OAuth application registration and its approved callback URL are required before account sign-in can be enabled.</span></div>
-    <a class="official-link" href="https://www.roblox.com/login" target="_blank" rel="noopener noreferrer">Open official Roblox sign-in ↗</a>
-    <button class="secondary-button" id="gotIt">Got it</button>
+    <div class="dialog-mark">N</div><div class="eyebrow">YOUR NETBLOX ACCOUNT</div>
+    <h2 id="authTitle">Welcome back</h2>
+    <p id="authIntro">Sign in or create a free Netblox account. Your account stays signed in on this device for up to 30 days.</p>
+    <div class="auth-tabs"><button type="button" class="auth-tab active" id="showLogin">Sign in</button><button type="button" class="auth-tab" id="showRegister">Create account</button></div>
+    <form id="authForm" class="auth-form">
+      <label>Username<input id="authUsername" name="username" autocomplete="username" minlength="3" maxlength="20" required placeholder="Your username"></label>
+      <label>Password<input id="authPassword" name="password" type="password" autocomplete="current-password" minlength="10" maxlength="128" required placeholder="At least 10 characters"></label>
+      <p class="auth-error" id="authError" role="alert" hidden></p>
+      <button class="official-link" id="authSubmit" type="submit">Sign in</button>
+    </form>
+    <div class="account-state" id="accountState" hidden><strong id="accountGreeting"></strong><span>You're signed in on this device.</span><button class="secondary-button" id="logoutButton" type="button">Sign out</button></div>
+    <div class="auth-footnote">Netblox accounts are separate from Roblox accounts. We never ask for your Roblox password or session cookie. Roblox OAuth can be connected separately.</div>
   </dialog>
   <script src="/netblox/app.js" defer></script>
 </body>
