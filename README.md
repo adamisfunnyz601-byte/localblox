@@ -1,7 +1,6 @@
 # play.roblox.com — local mirror
 
-Runs the user's full `play.roblox.com` site dump entirely on
-`http://localhost:8080` from a single Python-stdlib server. No proxy, no CA
+Netblox adds a custom browser launcher in front of the Localblox play.roblox.com site dump. The launcher is served at /; the game client remains available at /games/start. Both run from a single Python-stdlib server. No proxy, no CA
 cert, no `/etc/hosts` edit, no sudo. The site **shell + WebGL engine boot
 fully offline**; only *game traffic* (live API/asset/join calls) is forwarded
 to the real Roblox hosts, and only through an explicit same-origin bridge.
@@ -13,14 +12,13 @@ Dump target build: `version-75f1039cb4964863-RobloxWebClient`
 
 ```fish
 # start (from this directory)
-python3 server.py 8080          # default port 8080
+PORT=8080 python3 server.py     # listens on 0.0.0.0; defaults to 8080
 
 # stop   (bracket trick so pkill doesn't match its own shell and suicide)
 pkill -f '[s]erver\.py 8080'
 ```
 
-Then open `http://localhost:8080/` (redirects to `/games/start`). To join a
-specific place: `http://localhost:8080/games/start?placeId=<id>`.
+Open http://localhost:8080/ for Netblox. To open the underlying game client directly, visit http://localhost:8080/games/start?placeId=<id>.
 
 ## Architecture
 
@@ -68,39 +66,22 @@ lost content types. The server therefore falls back to `+.html` / `+.png`
 lookup ignoring the query, and re-derives content types (JSON-sniffing where
 needed).
 
-## Playing a live game (auth)
+## Authentication and account safety
 
-Joining a live server requires a logged-in session. Anonymous join is
-rejected by Roblox: `gamejoin …/v1/join-game` returns
-`{"status":12,"message":"Unable to join Game 212"}` (engine logs
-`[LIFECYCLE] joinGameFailed state=12`).
+Netblox does **not** collect Roblox passwords or .ROBLOSECURITY cookies. The server bridge deliberately strips incoming Cookie headers and does not read a cookie file. The old Localblox cookie-file workflow is disabled in this fork.
 
-To authenticate, create `cookie.txt` in this directory containing your
-`.ROBLOSECURITY` cookie value (the file content is sent verbatim as the
-`Cookie` header on bridged requests; **never commit it**):
+Roblox OAuth 2.0 can authenticate a Roblox identity and authorize supported Open Cloud scopes, but its ID/access tokens are **not** a general Roblox gameplay session and cannot be used as a replacement for the browser's official game-join session. Netblox's sign-in UI therefore remains an integration placeholder until an approved OAuth app and a supported gameplay authentication path are available. Users are sent only to Roblox's official website for sign-in.
 
-```fish
-# value only, no "Cookie:" prefix, no quotes
-echo -n '<your .ROBLOSECURITY value>' > cookie.txt
-chmod 600 cookie.txt
-```
+Live Roblox game joins may still be rejected when Roblox requires a gameplay session. Do not add cookie collection, cookie forwarding, login-page proxying, or credential capture to work around this restriction.
 
-If `cookie.txt` is absent, the bridge falls back to forwarding the browser's
-own `Cookie` header (which is empty on a localhost origin). Note the cookie
-value is a live credential — treat it as exposed and rotate it if concerned.
+## Netblox launcher
 
-## What works today
+- / serves the Netblox launcher.
+- /netblox/ contains its CSS and JavaScript assets.
+- /games/start?placeId=<id> opens the Localblox browser client.
+- The current launcher includes a small starter catalogue and client-side search/filtering. It does not yet fetch live trending/search results from Roblox.
 
-- Full page + Next.js shell, CSS, fonts, favicons — all local.
-- WebGL/WebAssembly engine (`WasmPlayer.js` + `WebClient.js` + 100 MB
-  `WebClient.wasm`) boots, registers 2862 asset metadata entries, runs the
-  render loop, and renders the authentic "Joining experience" loading screen.
-- ClientSettings, flags (22937), metadata, shaders, sky/plastic textures,
-  fonts — served locally (dump + live-fill).
-- Live game traffic via the bridge: `gamejoin`, `assetdelivery`, `ecsv2`,
-  `ephemeralcounters`, `fts.rbxcdn.com` (real place geometry), etc.
-- The place's Lua runs and geometry loads; the last hop (authenticated join
-  to a live server) is the only step gated behind `cookie.txt`.
+The server accepts the platform PORT environment variable and binds to 0.0.0.0 for hosting behind a reverse proxy.
 
 ## Debugging
 
@@ -126,7 +107,6 @@ value is a live credential — treat it as exposed and rotate it if concerned.
 - `local-shim.js` — two-tier runtime URL remap (`__HOSTS__` placeholder is
   substituted at serve time).
 - `<host-dirs>/…` — the extracted dump (also accumulates live-filled assets).
-- `cookie.txt` — optional, user-created, holds `.ROBLOSECURITY` for the bridge.
 
 ## History
 
