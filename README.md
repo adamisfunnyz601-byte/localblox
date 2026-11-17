@@ -26,7 +26,7 @@ One handler (`server.py`) routes by first path segment:
 
 | Path                                   | Served from                                     |
 |----------------------------------------|-------------------------------------------------|
-| `/`                                    | 302 → `/games/start`                             |
+| `/`                                    | Netblox launcher                                 |
 | `/<dumped-host>/<path>`                | virtual host off the dump (e.g. `/games.roblox.com/...`) |
 | `/__up/<host>/<path>`                  | **live bridge** — forwarded server-side to the real `*.roblox.com` / `*.rbxcdn.com` host |
 | `/<anything else>`                     | default host `play.roblox.com` (root-relative page assets) |
@@ -102,8 +102,9 @@ The server accepts the platform PORT environment variable and binds to 0.0.0.0 f
 
 ## Files
 
-- `server.py` — the server: routing, live-fill, bridge, COOP/COEP, transforms,
+- `server.py` — the server: Netblox launcher routing, live-fill, anonymous bridge, COOP/COEP, transforms,
   engine prelude.
+- `netblox/` — Netblox launcher HTML, CSS and JavaScript.
 - `local-shim.js` — two-tier runtime URL remap (`__HOSTS__` placeholder is
   substituted at serve time).
 - `<host-dirs>/…` — the extracted dump (also accumulates live-filled assets).
