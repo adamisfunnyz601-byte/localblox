@@ -19,6 +19,7 @@ rewritten to this origin in text bodies; runtime-built URLs are remapped by
 Run:  python3 server.py [port]     (default 8080)
 """
 import json
+import os
 import re
 import sys
 import urllib.parse
@@ -32,8 +33,9 @@ try:
 except ImportError:
     yaml = None  # graceful fallback – config values will use defaults only
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
-LOCAL = f"http://localhost:{PORT}"
+PORT = int(os.environ.get("PORT") or (sys.argv[1] if len(sys.argv) > 1 else 8080))
+# Use same-origin relative paths behind HTTPS reverse proxies.
+LOCAL = ""
 DUMP = Path(__file__).resolve().parent
 DEFAULT_HOST = "play.roblox.com"
 SHIM_PATH = DUMP / "local-shim.js"
@@ -65,10 +67,6 @@ if isinstance(_cfg, dict):
     if _page is not None:
         PAGE_BUILD = str(_page)
 
-    _cookie = _cfg.get("cookie_path")
-    if _cookie is not None:
-        COOKIE_PATH = DUMP / str(_cookie)
-
     # enable_fill and enable_bridge are read-only flags; the actual logic
     # lives in the route handlers and upstream_allowed().
 
@@ -92,39 +90,6 @@ ABS_URL_RE = re.compile(rf"https?://({HOST_ALT})(?![A-Za-z0-9.-])")
 # window patches from the page).
 SHIM_JS = SHIM_PATH.read_text().replace("__HOSTS__", json.dumps(HOSTS))
 ENGINE_DIR = f"setup.rbxcdn.com/webclient/{BUILD}/"
-
-# Optional auth for the live bridge: file content is sent verbatim as the
-# Cookie header (e.g. ".ROBLOSECURITY=...") — see README.
-COOKIE_PATH = DUMP / "cookie.txt"
-
-
-def load_cookie() -> str:
-    """Return cookie.txt content as a valid Cookie header value.
-
-    Accepts either a bare .ROBLOSECURITY value (Roblox's long
-    '_|WARNING:-DO-NOT-SHARE...' token) or a full 'name=value' /
-    'name=value; name2=value2' string. A bare value must be wrapped as
-    '.ROBLOSECURITY=<value>' — an unwrapped bare token has no cookie *name*,
-    so Roblox ignores the header and treats the session as anonymous.
-
-    Note the bare token itself may contain '=' (base64 padding), so we detect
-    it by the leading '_|' marker rather than by the presence of '='.
-    """
-    raw = COOKIE_PATH.read_text().strip()
-    if not raw:
-        return ""
-    # Strip an accidental 'Cookie:' prefix and surrounding quotes.
-    if raw.lower().startswith("cookie:"):
-        raw = raw[7:].strip()
-    raw = raw.strip('"')
-    # Bare Roblox security token (starts with the '_|' WARNING marker).
-    if raw.startswith("_|"):
-        return f".ROBLOSECURITY={raw}"
-    # Already a name=value pair (or several, ';'-separated) — use as-is.
-    if "=" in raw:
-        return raw
-    # Some other bare token: assume it's a .ROBLOSECURITY value too.
-    return f".ROBLOSECURITY={raw}"
 
 TEXT_EXT = {".js", ".json", ".html", ".css"}
 CONTENT_TYPES = {
@@ -285,11 +250,6 @@ class Handler(BaseHTTPRequestHandler):
         headers["Accept-Encoding"] = "identity"
         headers["Origin"] = "https://play.roblox.com"
         headers["Referer"] = "https://play.roblox.com/"
-        if COOKIE_PATH.exists() and COOKIE_PATH.read_text().strip():
-            headers["Cookie"] = load_cookie()
-        elif self.headers.get("Cookie"):
-            headers["Cookie"] = self.headers["Cookie"]
-
         body = b""
         n = int(self.headers.get("Content-Length") or 0)
         if n:
@@ -314,13 +274,6 @@ class Handler(BaseHTTPRequestHandler):
         ctype = rheaders.get("Content-Type", "application/octet-stream")
         print(f"[bridge] {self.command} {host}/{rel} -> {status}"
               f" ({len(data):,} bytes)", flush=True)
-        if host == "gamejoin.roblox.com":
-            safe_headers = {k: ("<redacted>" if k.lower() == "cookie" else v)
-                            for k, v in headers.items()}
-            with open("/tmp/opencode/join-debug.txt", "ab") as f:
-                f.write(f"\n=== {self.command} {host}/{rel}?{query} -> {status}\n"
-                        f"REQ BODY: {body!r}\nREQ HEADERS: {safe_headers}\n"
-                        f"RESP: {data[:2000]!r}\n".encode())
         self._send(status, data, ctype)
 
     # ---- routes -----------------------------------------------------------
@@ -334,7 +287,20 @@ class Handler(BaseHTTPRequestHandler):
                        {"Cache-Control": "no-store"})
             return
         if path == "/":
-            self._redirect("/games/start")
+            launcher = DUMP / "netblox" / "index.html"
+            self._send(200, launcher.read_bytes(), "text/html",
+                       {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
+            return
+
+        if path.startswith("/netblox/"):
+            base = (DUMP / "netblox").resolve()
+            target = (DUMP / path.lstrip("/")).resolve()
+            if not target.is_relative_to(base) or not target.is_file():
+                self._send(404, b"not found\\n", "text/plain")
+                return
+            data = target.read_bytes()
+            self._send(200, data, sniff_type(target, data),
+                       {"X-Content-Type-Options": "nosniff"})
             return
 
         parts = path.lstrip("/").split("/", 1)
@@ -388,5 +354,5 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     print(f"hosts: {', '.join(HOSTS)}")
-    print(f"serving dump {DUMP} on {LOCAL}  (default host: {DEFAULT_HOST})")
-    ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+    print(f"serving Netblox + dump {DUMP} on 0.0.0.0:{PORT}  (default host: {DEFAULT_HOST})")
+    ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
