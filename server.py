@@ -203,6 +203,156 @@ def upstream_allowed(host: str) -> bool:
         or host.endswith(".rbxcdn.com")
 
 
+# ---- Netblox accounts: password hashes + revocable persistent sessions ----
+import hashlib
+import hmac
+import secrets
+import sqlite3
+import time
+from http.cookies import SimpleCookie
+
+DB_PATH = Path(os.environ.get("NETBLOX_DB_PATH") or
+               (Path(os.environ.get("NETBLOX_DATA_DIR", str(DUMP))) / "netblox.sqlite3"))
+SESSION_DAYS = 30
+COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "1").lower() not in ("0", "false", "no")
+
+def db_connect():
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(DB_PATH), timeout=15)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_auth_db():
+    with db_connect() as db:
+        db.execute("""CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL,
+            username_key TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
+            password_salt TEXT NOT NULL, created_at INTEGER NOT NULL)""")
+        db.execute("""CREATE TABLE IF NOT EXISTS sessions (
+            token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            expires_at INTEGER NOT NULL, created_at INTEGER NOT NULL)""")
+        db.execute("CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions(expires_at)")
+        db.execute("DELETE FROM sessions WHERE expires_at < ?", (int(time.time()),))
+
+def password_digest(password, salt_hex):
+    return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"),
+                               bytes.fromhex(salt_hex), 310000).hex()
+
+def auth_json(handler, status, payload, extra=None):
+    body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    headers = {"Cache-Control": "no-store", "Pragma": "no-cache",
+               "X-Content-Type-Options": "nosniff"}
+    headers.update(extra or {})
+    handler._send(status, body, "application/json; charset=utf-8", headers)
+
+def request_json(handler):
+    if handler.headers.get("Content-Type", "").split(";", 1)[0].strip().lower() != "application/json":
+        raise ValueError("Send JSON.")
+    length = int(handler.headers.get("Content-Length") or 0)
+    if length < 1 or length > 8192:
+        raise ValueError("Invalid request size.")
+    value = json.loads(handler.rfile.read(length).decode("utf-8"))
+    if not isinstance(value, dict):
+        raise ValueError("Invalid request.")
+    return value
+
+def current_user(handler):
+    cookie = SimpleCookie()
+    try:
+        cookie.load(handler.headers.get("Cookie", ""))
+        morsel = cookie.get("netblox_session")
+        token = morsel.value if morsel else ""
+    except Exception:
+        token = ""
+    if not token or len(token) > 200:
+        return None
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    with db_connect() as db:
+        row = db.execute("""SELECT users.id, users.username FROM sessions
+            JOIN users ON users.id=sessions.user_id
+            WHERE sessions.token_hash=? AND sessions.expires_at>?""",
+            (token_hash, int(time.time()))).fetchone()
+    return {"id": row["id"], "username": row["username"]} if row else None
+
+def issue_session(handler, user_id):
+    token = secrets.token_urlsafe(48)
+    now = int(time.time())
+    expires = now + SESSION_DAYS * 86400
+    with db_connect() as db:
+        db.execute("INSERT INTO sessions(token_hash,user_id,expires_at,created_at) VALUES(?,?,?,?)",
+                   (hashlib.sha256(token.encode()).hexdigest(), user_id, expires, now))
+    secure = "; Secure" if COOKIE_SECURE else ""
+    return {"Set-Cookie": f"netblox_session={token}; Path=/; Max-Age={SESSION_DAYS*86400}; HttpOnly; SameSite=Lax{secure}"}
+
+def auth_route(handler, path):
+    if path == "/api/auth/me" and handler.command == "GET":
+        user = current_user(handler)
+        auth_json(handler, 200, {"authenticated": bool(user), "user": user})
+        return True
+    if path == "/api/auth/register" and handler.command == "POST":
+        try:
+            data = request_json(handler)
+            username, password = data.get("username"), data.get("password")
+            if not isinstance(username, str) or not isinstance(password, str):
+                raise ValueError("Enter a username and password.")
+            username = username.strip()
+            if not re.fullmatch(r"[A-Za-z0-9_]{3,20}", username):
+                raise ValueError("Username must be 3–20 characters (letters, numbers or _).")
+            if len(password) < 10 or len(password) > 128:
+                raise ValueError("Password must be 10–128 characters.")
+            salt = secrets.token_hex(16)
+            digest = password_digest(password, salt)
+            now = int(time.time())
+            with db_connect() as db:
+                cur = db.execute("""INSERT INTO users(username,username_key,password_hash,password_salt,created_at)
+                    VALUES(?,?,?,?,?)""", (username, username.casefold(), digest, salt, now))
+                user_id = cur.lastrowid
+            auth_json(handler, 201, {"authenticated": True, "user": {"id": user_id, "username": username}},
+                      issue_session(handler, user_id))
+        except sqlite3.IntegrityError:
+            auth_json(handler, 409, {"error": "That username is already taken."})
+        except (ValueError, json.JSONDecodeError, UnicodeDecodeError) as e:
+            auth_json(handler, 400, {"error": str(e) or "Invalid request."})
+        return True
+    if path == "/api/auth/login" and handler.command == "POST":
+        try:
+            data = request_json(handler)
+            username, password = data.get("username"), data.get("password")
+            if not isinstance(username, str) or not isinstance(password, str):
+                raise ValueError("Enter your username and password.")
+            if len(username) > 20 or len(password) > 128:
+                raise ValueError("Incorrect username or password.")
+            with db_connect() as db:
+                row = db.execute("SELECT id,username,password_hash,password_salt FROM users WHERE username_key=?",
+                                 (username.strip().casefold(),)).fetchone()
+            if not row or not hmac.compare_digest(password_digest(password, row["password_salt"]), row["password_hash"]):
+                auth_json(handler, 401, {"error": "Incorrect username or password."})
+                return True
+            auth_json(handler, 200, {"authenticated": True, "user": {"id": row["id"], "username": row["username"]}},
+                      issue_session(handler, row["id"]))
+        except (ValueError, json.JSONDecodeError, UnicodeDecodeError) as e:
+            auth_json(handler, 400, {"error": str(e) or "Invalid request."})
+        return True
+    if path == "/api/auth/logout" and handler.command == "POST":
+        cookie = SimpleCookie()
+        try:
+            cookie.load(handler.headers.get("Cookie", ""))
+            morsel = cookie.get("netblox_session")
+            token = morsel.value if morsel else ""
+        except Exception:
+            token = ""
+        if token:
+            with db_connect() as db:
+                db.execute("DELETE FROM sessions WHERE token_hash=?",
+                           (hashlib.sha256(token.encode()).hexdigest(),))
+        secure = "; Secure" if COOKIE_SECURE else ""
+        auth_json(handler, 200, {"authenticated": False},
+                  {"Set-Cookie": f"netblox_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax{secure}"})
+        return True
+    return False
+
+
+
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     server_version = "play-roblox-local"
@@ -282,6 +432,8 @@ class Handler(BaseHTTPRequestHandler):
         raw = urlsplit(self.path)
         path = unquote(raw.path)
 
+        if path.startswith("/api/auth/") and auth_route(self, path):
+            return
         if path == "/local-shim.js":
             body = SHIM_PATH.read_text().replace("__HOSTS__", json.dumps(HOSTS))
             self._send(200, body.encode(), "application/javascript",
@@ -354,6 +506,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    init_auth_db()
     print(f"hosts: {', '.join(HOSTS)}")
     print(f"serving Netblox + dump {DUMP} on 0.0.0.0:{PORT}  (default host: {DEFAULT_HOST})")
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
